@@ -42,6 +42,7 @@ public:
     void ProgramFlash(QString fileName);
     QByteArray CreateFlashPacket(int start, int end, QList<QByteArray> hexContent);
     void WaitMs(int ms);
+    void WaitMsNofeedback(int ms);
 public slots:
     void ComportReadyRead();
 
@@ -55,6 +56,10 @@ private slots:
     void on_BtnErase_clicked();
 
     void on_BtnFlash_clicked();
+
+    void on_BtnGotoBoot_clicked();
+
+    void on_BootGoToBootFromFlash_clicked();
 
 private:
     Ui::MainWindow *ui;

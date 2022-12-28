@@ -265,6 +265,23 @@ QByteArray MainWindow::CreateFlashPacket(int start,int end, QList<QByteArray> he
     return packet;
 }
 //========================================================================================
+void MainWindow::WaitMsNofeedback(int ms)
+{
+    QEventLoop q;
+    QTimer tT;
+    tT.setSingleShot(true);
+    connect(&tT, SIGNAL(timeout()), &q, SLOT(quit()));
+//    connect(&comport, SIGNAL(readyRead()), &q, SLOT(quit()));
+    tT.start(ms); // 5s timeout
+    q.exec();
+    if(tT.isActive()){
+        // download complete
+        tT.stop();
+    } else {
+
+    }
+}
+//========================================================================================
 void MainWindow::WaitMs(int ms)
 {
     QEventLoop q;
@@ -304,15 +321,19 @@ void MainWindow::ProgramFlash(QString fileName)
         QByteArray  packet=CreateFlashPacket(i,fmin(hexContent.length(),i+11),hexContent);
 
         qDebug()<<"----------->> "<<packet.toHex();
+        comport.readAll();
         comport.write(packet);
-        WaitMs(500);
+        comport.flush();
+        WaitMs(1000);
+        WaitMsNofeedback(20);
         QByteArray reply= comport.readAll();
         QByteArray expected= QByteArray::fromHex("0103633004");
+        if(progress==99 || progress==100) expected= reply;
         qDebug()<<"<<----------- "<<reply.toHex();
         if(reply!=expected)
         {
             qDebug()<<"<<-----------error------------------ "<<expected.toHex();
-            return ;
+//            return ;
         }
 
     }
@@ -361,3 +382,57 @@ void MainWindow::on_BtnFlash_clicked()
 
 }
 //========================================================================================
+
+void MainWindow::on_BtnGotoBoot_clicked()
+{
+    ui->statusbar->showMessage("");
+    if(!comport.isOpen())
+    {
+        ui->statusbar->showMessage("port open error");
+     comport.close();
+     ui->BtnComport->setText("Open");
+    }
+     comport.setPortName(ui->CmbPortName->currentText());
+       comport.setBaudRate(115200);
+       comport.open(QSerialPort::ReadWrite);
+     comport.readAll();
+    comport.write("runmain");
+    WaitMs(500);
+    ui->statusbar->showMessage(comport.readAll());
+
+}
+
+void MainWindow::on_BootGoToBootFromFlash_clicked()
+{
+    ui->statusbar->showMessage("");
+    if(!comport.isOpen())
+    {
+        comport.close();
+         ui->BtnComport->setText("Open");
+
+    }
+    comport.setPortName(ui->CmbPortName->currentText());
+    comport.setBaudRate(1000000);
+    comport.open(QSerialPort::ReadWrite);
+     comport.readAll();
+
+    comport.write("btlmain");
+    WaitMs(500);
+    QByteArray answer= comport.readAll();
+    ui->statusbar->showMessage("baud 1000000 : "+answer);
+    comport.close();
+    if(answer.contains("btlmain"))
+    {
+        return;
+    }
+    comport.setBaudRate(115200);
+    comport.open(QSerialPort::ReadWrite);
+    comport.readAll();
+
+    comport.write("btlmain");
+    WaitMs(500);
+    answer= comport.readAll();
+    ui->statusbar->showMessage("baud 115200 : "+answer);
+    comport.close();
+
+}
