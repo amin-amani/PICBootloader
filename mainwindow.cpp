@@ -448,13 +448,14 @@ void MainWindow::on_BtnGetCodeVersion_clicked()
         ui->statusbar->showMessage("port open error");
         return;
     }
+    comport.setBaudRate(1000000);
     comport.readAll();
     QByteArray ba;//=FE0A00000000000000000000000000000000000000000000F4
     ba=QByteArray::fromHex("FE0A00000000000000000000000000000000000000000000F4");
     comport.write(ba);
     WaitMs(500);
     QByteArray reply= comport.readAll();
-    ui->statusbar->showMessage(reply.toHex());
+    ui->statusbar->showMessage(reply);
 }
 
 void MainWindow::on_BtnRefreshPort_clicked()
