@@ -43,11 +43,11 @@ void MainWindow::on_BtnComport_clicked()
         if(!comport.open(QSerialPort::ReadWrite))
         {
 
-            ui->statusbar->showMessage("open error!");
+            ui->statusbar->showMessage("Port Open Error!");
 
         }
         ui->BtnComport->setText("Close");
-        ui->statusbar->showMessage("Open ok");
+        ui->statusbar->showMessage("Port Opened Successfully!");
     }
     else
     {
@@ -435,4 +435,23 @@ void MainWindow::on_BootGoToBootFromFlash_clicked()
     ui->statusbar->showMessage("baud 115200 : "+answer);
     comport.close();
 
+}
+
+
+
+void MainWindow::on_BtnGetCodeVersion_clicked()
+{
+    ui->statusbar->showMessage("");
+    if(!comport.isOpen())
+    {
+        ui->statusbar->showMessage("port open error");
+        return;
+    }
+    comport.readAll();
+    QByteArray ba;//=FE0A00000000000000000000000000000000000000000000F4
+    ba=QByteArray::fromHex("FE0A00000000000000000000000000000000000000000000F4");
+    comport.write(ba);
+    WaitMs(500);
+    QByteArray reply= comport.readAll();
+    ui->statusbar->showMessage(reply.toHex());
 }

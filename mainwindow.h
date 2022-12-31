@@ -61,6 +61,9 @@ private slots:
 
     void on_BootGoToBootFromFlash_clicked();
 
+
+    void on_BtnGetCodeVersion_clicked();
+
 private:
     Ui::MainWindow *ui;
 };
