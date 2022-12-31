@@ -64,6 +64,8 @@ private slots:
 
     void on_BtnGetCodeVersion_clicked();
 
+    void on_BtnRefreshPort_clicked();
+
 private:
     Ui::MainWindow *ui;
 };

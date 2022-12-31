@@ -333,7 +333,8 @@ void MainWindow::ProgramFlash(QString fileName)
         if(reply!=expected)
         {
             qDebug()<<"<<-----------error------------------ "<<expected.toHex();
-//            return ;
+            ui->statusbar->showMessage("Flash Error!");
+            return ;
         }
 
     }
@@ -454,4 +455,14 @@ void MainWindow::on_BtnGetCodeVersion_clicked()
     WaitMs(500);
     QByteArray reply= comport.readAll();
     ui->statusbar->showMessage(reply.toHex());
+}
+
+void MainWindow::on_BtnRefreshPort_clicked()
+{
+    QList<QSerialPortInfo> list=   QSerialPortInfo::availablePorts();
+    ui->CmbPortName->clear();
+    for (int i=0;i<list.length();i++)
+    {
+        ui->CmbPortName->addItem(list[i].portName());
+    }
 }
