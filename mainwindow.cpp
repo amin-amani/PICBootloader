@@ -138,6 +138,55 @@ QList<QByteArray> MainWindow::LoadHexFile(   QString HexFilePath )
 
     return result;
 }
+QByteArray MainWindow::LoadHexFileValve(   QString HexFilePath )
+{
+    int iRet;
+    QByteArray result;
+    //	char HexRec[255];
+    QByteArray HexRec;
+
+    // Open file
+    QFile HexFilePtr(HexFilePath);
+
+    if(!QFile::exists(HexFilePath))
+    {
+        qDebug()<<"Failed to open hex file.";
+        return result;
+    }
+    else
+    {
+        if(!HexFilePtr.open(QFile::ReadOnly))
+        {
+            qDebug()<<"cant open file";
+            return result;
+        }
+        qDebug()<<"reading file";
+
+        while (true)
+        {
+            HexRec=HexFilePtr.readLine().trimmed();
+            if(HexRec!="")
+
+                if(HexRec.length()<20){
+                    HexRec.append("ff");
+                    HexRec.append("3f");
+                    HexRec.append("ff");
+                    HexRec.append("3f");
+                }
+            // qDebug()<<
+
+            result.append(HexRec.mid(9,HexRec.length()-(9+2)));//ff 3f ff 3f
+
+            if(HexRec.length()<1)break;
+
+        }
+
+    }
+    qDebug()<<"===========";
+    qDebug()<<"hex:"<<result;
+    // qDebug()<<"===========";
+    return result;
+}
 
 QByteArray MainWindow::CreateEraseCommand()
 {
@@ -275,6 +324,46 @@ QByteArray MainWindow::CreateFlashPacket(int start,int end, QList<QByteArray> he
     return packet;
 }
 //========================================================================================
+QByteArray MainWindow::CreateFlashPacketValve(int start,int end,uint32_t flashAddress, QByteArray hexContent)
+{
+    QByteArray buffer;
+
+    buffer.append(0x55);
+    buffer.append(0x02);
+    buffer.append(0x10);
+    buffer.append((char)0x00);
+    buffer.append(0x55);
+    buffer.append(0xaa);
+
+
+    buffer.append(flashAddress&0xff);
+    buffer.append((flashAddress>>8)&0xff);
+    buffer.append((flashAddress>>16)&0xff);
+    buffer.append((flashAddress>>24)&0xff);
+
+    for(int i=start;i<end;i++)
+    {
+        buffer.append(hexContent[i]);
+
+    }
+    //    uint16_t crc=CalculateCrc((char*)buffer.toStdString().c_str(),buffer.length());
+    //    buffer.append(crc&0xff);
+    //    buffer.append((crc>>8)&0xff);
+    //    QByteArray packet;
+    //    packet.append(SOH);
+    //    for(int i=0;i<buffer.length();i++)
+    //    {
+    //        if((buffer[i]&0xff)==EOT ||(buffer[i]&0xff)==DLE || (buffer[i]&0xff)==SOH )
+    //        {
+    //            packet.append(DLE);
+    //        }
+    //        packet.append(buffer[i]);
+
+    //    }
+    //    packet.append(EOT);
+    return buffer;
+}
+//========================================================================================
 void MainWindow::WaitMsNofeedback(int ms)
 {
     QEventLoop q;
@@ -351,6 +440,70 @@ void MainWindow::ProgramFlash(QString fileName)
     ui->PgrFlash->setValue(100);
 }
 //========================================================================================
+void MainWindow::ProgramFlashValve(QString fileName)
+{
+
+    ui->PgrFlash->setValue(0);
+    if(!comport.isOpen())
+    {
+        ui->statusbar->showMessage("port is closed");
+        return;
+    }
+    comport.readAll();
+    QByteArray stringContent= LoadHexFileValve(fileName);
+    QByteArray hexContent =QByteArray::fromHex(stringContent);
+    //GetHexFromContent(stringContent);
+
+
+    for (int i=0;i<hexContent.length();i+=16)
+    {
+        int progress=i*100/hexContent.length();
+        qDebug()<<"completed:"<< progress<<"%";
+        ui->PgrFlash->setValue(progress);
+        int add=2048+i/2;//fmin(hexContent.length(),i+11)
+        QByteArray  packet=CreateFlashPacketValve(i,fmin(hexContent.length(),i+16),add,hexContent);
+
+        qDebug()<<"----------->> "<<packet.toHex();
+        comport.readAll();
+        comport.write(packet);
+        comport.flush();
+        WaitMs(1000);
+        WaitMsNofeedback(20);
+        QByteArray reply= comport.readAll();
+
+        QString rx="5502100055aa";
+
+
+        if((add&0xff)<16)rx+="0";
+        rx+=QString::number(add&0xff,16);
+        add>>=8;
+         if((add&0xff)<16)rx+="0";
+        rx+=QString::number(add&0xff,16);
+        add>>=8;
+        if((add&0xff)<16)rx+="0";
+        rx+=QString::number(add&0xff,16);
+        add>>=8;
+        if((add&0xff)<16)rx+="0";
+        rx+=QString::number(add&0xff,16);
+
+        rx+="01";
+
+       // qDebug()<<"<<-----rx------ "<<rx;
+
+        QByteArray expected= QByteArray::fromHex(rx.toLatin1());
+        if(progress==99 || progress==100) expected= reply;
+        qDebug()<<"<<----------- "<<reply.toHex();
+        if(reply!=expected)
+        {
+            qDebug()<<"<<-----------error------------------ "<<expected.toHex();
+            ui->statusbar->showMessage("Flash Error!");
+            return ;
+        }
+
+    }
+    ui->PgrFlash->setValue(100);
+}
+//========================================================================================
 void MainWindow::on_BtnLoadHex_clicked()
 {
     ui->statusbar->showMessage("");
@@ -364,17 +517,26 @@ void MainWindow::on_BtnLoadHex_clicked()
 void MainWindow::on_BtnErase_clicked()
 {
     ui->statusbar->showMessage("");
+    QString type[4]={"0102422004","5503800355AA00040000","5503800355AA00040000","5503800355AA00040000"};
+    QString correctReplay[4]={"0102422004","5503800355AA0004000001","5503800355AA0004000001","5503800355AA0004000001"};
     if(!comport.isOpen())
     {
         ui->statusbar->showMessage("port open error");
         return;
     }
     comport.readAll();
-    comport.write(CreateEraseCommand());
+    if(ui->CmbBoardType->currentIndex()==0)comport.write(CreateEraseCommand());
+    else {
+        qDebug()<<"-->"<<type[ui->CmbBoardType->currentIndex()];
+        comport.write(QByteArray::fromHex(type[ui->CmbBoardType->currentIndex()].toLatin1()));
+    }
     WaitMs(500);
     QByteArray reply= comport.readAll();
-    if(reply!=QByteArray::fromHex("0102422004"))
-    { ui->statusbar->showMessage("Erase chip error!");
+    qDebug()<<"replay="<<reply.toHex();
+
+    if(reply!=QByteArray::fromHex(correctReplay[ui->CmbBoardType->currentIndex()].toLatin1()))
+    {
+        ui->statusbar->showMessage("Erase chip error!");
         return;
     }
     ui->statusbar->showMessage("Erase Ok");
@@ -384,12 +546,16 @@ void MainWindow::on_BtnErase_clicked()
 //========================================================================================
 void MainWindow::on_BtnFlash_clicked()
 {
+
     if(fileName=="")
     {
         ui->statusbar->showMessage("please select hex file");
         return;
     }
-    ProgramFlash(fileName);
+    if(ui->CmbBoardType->currentIndex()==0)
+        ProgramFlash(fileName);
+    else
+        ProgramFlashValve(fileName);
 
 }
 //========================================================================================
@@ -407,7 +573,11 @@ void MainWindow::on_BtnGotoBoot_clicked()
     comport.setBaudRate(115200);
     comport.open(QSerialPort::ReadWrite);
     comport.readAll();
-    comport.write("runmain1");
+    QString text="run"+ui->CmbBoardType->currentText()+ui->CmbBoardID->currentText();
+    qDebug()<<text;
+    comport.write(text.toLatin1());
+
+
     WaitMs(500);
     ui->statusbar->showMessage(comport.readAll());
 
@@ -471,9 +641,9 @@ void MainWindow::on_BtnGetCodeVersion_clicked()
     QString command=QString::number(id,16);
     command+="0400";
 
-//    command+="1E";//main
-//    command+="00";//valv feeder
-//    command+="07";//relay
+    //    command+="1E";//main
+    //    command+="00";//valv feeder
+    //    command+="07";//relay
     command+=type[ui->CmbBoardType->currentIndex()];
 
     command+="0001";

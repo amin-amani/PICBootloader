@@ -43,9 +43,13 @@ public:
     QByteArray CreateFlashPacket(int start, int end, QList<QByteArray> hexContent);
     void WaitMs(int ms);
     void WaitMsNofeedback(int ms);
+    QByteArray LoadHexFileValve(QString HexFilePath);
 public slots:
     void ComportReadyRead();
 
+    QByteArray CreateFlashPacketValve(int start, int end, uint32_t flashAddress, QByteArray hexContent);
+protected slots:
+    void ProgramFlashValve(QString fileName);
 private slots:
     void on_BtnComport_clicked();
 
@@ -68,5 +72,6 @@ private slots:
 
 private:
     Ui::MainWindow *ui;
+
 };
 #endif // MAINWINDOW_H
