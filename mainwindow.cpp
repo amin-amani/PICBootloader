@@ -582,12 +582,14 @@ QString text="run";
     {
            text="run"+ui->CmbBoardType->currentText()+ui->CmbBoardID->currentText();
     }
-    qDebug()<<text;
+
     comport.write(text.toLatin1());
 
 
     WaitMs(500);
-    ui->statusbar->showMessage(comport.readAll());
+    QByteArray reply= comport.readAll();
+    ui->statusbar->showMessage(reply);
+    qDebug()<<"replay="<<reply.toHex();
 
 }
 
