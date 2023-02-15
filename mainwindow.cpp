@@ -573,7 +573,15 @@ void MainWindow::on_BtnGotoBoot_clicked()
     comport.setBaudRate(115200);
     comport.open(QSerialPort::ReadWrite);
     comport.readAll();
-    QString text="run"+ui->CmbBoardType->currentText()+ui->CmbBoardID->currentText();
+QString text="run";
+    if(ui->CmbBoardType->currentText()=="RLAL")
+    {
+                 text="run"+ui->CmbBoardType->currentText();
+    }
+    else
+    {
+           text="run"+ui->CmbBoardType->currentText()+ui->CmbBoardID->currentText();
+    }
     qDebug()<<text;
     comport.write(text.toLatin1());
 
@@ -596,7 +604,17 @@ void MainWindow::on_BootGoToBootFromFlash_clicked()
     comport.setBaudRate(115200);
     comport.open(QSerialPort::ReadWrite);
     comport.readAll();
-    QString text="btl"+ui->CmbBoardType->currentText()+ui->CmbBoardID->currentText();
+
+    QString text="btl";
+        if(ui->CmbBoardType->currentText()=="RLAL")
+        {
+                     text="btl"+ui->CmbBoardType->currentText();
+        }
+        else
+        {
+               text="btl"+ui->CmbBoardType->currentText()+ui->CmbBoardID->currentText();
+        }
+
     qDebug()<<text;
     comport.write(text.toLatin1());
     WaitMs(500);
