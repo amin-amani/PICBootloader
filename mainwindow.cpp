@@ -14,6 +14,16 @@ MainWindow::MainWindow(QWidget *parent)
     }
     comport.setPortName("COM9");
     comport.setBaudRate(115200);
+    ui->CmbBoardType->addItem("main");
+    ui->CmbBoardType->addItem("VALV");
+    ui->CmbBoardType->addItem("FEED");
+    ui->CmbBoardType->addItem("RLAL");
+
+    for (int i=1;i<255;i++)
+    {
+        ui->CmbBoardID->addItem(QString::number(i));
+    }
+
     //    connect(&comport,SIGNAL(readyRead()),this,SLOT(ComportReadyRead()));
 
 }
@@ -172,8 +182,8 @@ void MainWindow::on_BtnGetVersion_clicked()
     buffer.append(0x04);
     comport.write(buffer);//Bootloader Firmware Version: 32.32
     WaitMs(400);
-     QByteArray reply= comport.readAll();
-     qDebug()<<reply<<" hex"<<reply.toHex();
+    QByteArray reply= comport.readAll();
+    qDebug()<<reply<<" hex"<<reply.toHex();
     ui->statusbar->showMessage(ParsVersion(reply));
 
 
@@ -187,8 +197,8 @@ QString MainWindow::ParsVersion(QByteArray data)
 
     uint8_t major=data[3]&0xff;
     uint8_t minor=data[4]&0xff;
-     QString version= "version="+QString::number( major)+"."+QString::number( minor);
-     return version;
+    QString version= "version="+QString::number( major)+"."+QString::number( minor);
+    return version;
 }
 //========================================================================================
 QList<QByteArray> MainWindow::GetHexFromContent(QList<QByteArray> content)
@@ -271,7 +281,7 @@ void MainWindow::WaitMsNofeedback(int ms)
     QTimer tT;
     tT.setSingleShot(true);
     connect(&tT, SIGNAL(timeout()), &q, SLOT(quit()));
-//    connect(&comport, SIGNAL(readyRead()), &q, SLOT(quit()));
+    //    connect(&comport, SIGNAL(readyRead()), &q, SLOT(quit()));
     tT.start(ms); // 5s timeout
     q.exec();
     if(tT.isActive()){
@@ -359,7 +369,7 @@ void MainWindow::on_BtnErase_clicked()
         ui->statusbar->showMessage("port open error");
         return;
     }
-     comport.readAll();
+    comport.readAll();
     comport.write(CreateEraseCommand());
     WaitMs(500);
     QByteArray reply= comport.readAll();
@@ -390,14 +400,14 @@ void MainWindow::on_BtnGotoBoot_clicked()
     if(!comport.isOpen())
     {
         ui->statusbar->showMessage("port open error");
-     comport.close();
-     ui->BtnComport->setText("Open");
+        comport.close();
+        ui->BtnComport->setText("Open");
     }
-     comport.setPortName(ui->CmbPortName->currentText());
-       comport.setBaudRate(115200);
-       comport.open(QSerialPort::ReadWrite);
-     comport.readAll();
-    comport.write("runmain");
+    comport.setPortName(ui->CmbPortName->currentText());
+    comport.setBaudRate(115200);
+    comport.open(QSerialPort::ReadWrite);
+    comport.readAll();
+    comport.write("runmain1");
     WaitMs(500);
     ui->statusbar->showMessage(comport.readAll());
 
@@ -409,20 +419,23 @@ void MainWindow::on_BootGoToBootFromFlash_clicked()
     if(!comport.isOpen())
     {
         comport.close();
-         ui->BtnComport->setText("Open");
+        ui->BtnComport->setText("Open");
 
     }
     comport.setPortName(ui->CmbPortName->currentText());
-    comport.setBaudRate(1000000);
+    comport.setBaudRate(115200);
     comport.open(QSerialPort::ReadWrite);
-     comport.readAll();
-
-    comport.write("btlmain");
+    comport.readAll();
+    QString text="btl"+ui->CmbBoardType->currentText()+ui->CmbBoardID->currentText();
+    qDebug()<<text;
+    comport.write(text.toLatin1());
     WaitMs(500);
     QByteArray answer= comport.readAll();
+    qDebug()<<"ans="<<answer;
     ui->statusbar->showMessage("baud 1000000 : "+answer);
     comport.close();
-    if(answer.contains("btlmain"))
+
+    if(answer.contains(text.toLatin1()))
     {
         return;
     }
@@ -430,7 +443,7 @@ void MainWindow::on_BootGoToBootFromFlash_clicked()
     comport.open(QSerialPort::ReadWrite);
     comport.readAll();
 
-    comport.write("btlmain");
+    comport.write(text.toLatin1());
     WaitMs(500);
     answer= comport.readAll();
     ui->statusbar->showMessage("baud 115200 : "+answer);
@@ -443,19 +456,42 @@ void MainWindow::on_BootGoToBootFromFlash_clicked()
 void MainWindow::on_BtnGetCodeVersion_clicked()
 {
     ui->statusbar->showMessage("");
+    QString type[4]={"1E","00","00","07"};
     if(!comport.isOpen())
     {
         ui->statusbar->showMessage("port open error");
         return;
     }
-    comport.setBaudRate(1000000);
+    comport.setBaudRate(115200);
     comport.readAll();
     QByteArray ba;//=FE0A00000000000000000000000000000000000000000000F4
-    ba=QByteArray::fromHex("FE0A00000000000000000000000000000000000000000000F4");
+    //    0x01	0x04	0x00	0x1E	0x00	0x01
+    uint8_t id= ui->CmbBoardType->currentIndex()*10+ui->CmbBoardID->currentText().toInt();
+    if(ui->CmbBoardType->currentText()=="RLAL")id=100;
+    QString command=QString::number(id,16);
+    command+="0400";
+
+//    command+="1E";//main
+//    command+="00";//valv feeder
+//    command+="07";//relay
+    command+=type[ui->CmbBoardType->currentIndex()];
+
+    command+="0001";
+    ba=QByteArray::fromHex(command.toLatin1());
+    uint16_t crc=CalculateCrc(ba);
+    ba.append((crc>>8)&0xff);
+    ba.append(crc&0xff);
+    qDebug()<<"--->"<<ba.toHex();
     comport.write(ba);
+
     WaitMs(500);
     QByteArray reply= comport.readAll();
-    ui->statusbar->showMessage(reply);
+    qDebug()<<"<---"<< reply.toHex();
+    int version=reply[4]&0xff;
+    version<<=8;
+    version+=reply[5]&0xff;
+
+    ui->statusbar->showMessage(QString::number(version));
 }
 
 void MainWindow::on_BtnRefreshPort_clicked()
