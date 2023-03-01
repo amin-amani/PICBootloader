@@ -142,48 +142,40 @@ QByteArray MainWindow::LoadHexFileValve(   QString HexFilePath )
 {
     int iRet;
     QByteArray result;
-    //	char HexRec[255];
     QByteArray HexRec;
 
     // Open file
-    QFile HexFilePtr(HexFilePath);
+ //   QFile HexFilePtr(HexFilePath);
 
-    if(!QFile::exists(HexFilePath))
-    {
-        qDebug()<<"Failed to open hex file.";
-        return result;
-    }
-    else
-    {
-        if(!HexFilePtr.open(QFile::ReadOnly))
-        {
-            qDebug()<<"cant open file";
-            return result;
-        }
-        qDebug()<<"reading file";
+//    if(!QFile::exists(HexFilePath))
+//    {
+//        qDebug()<<"Failed to open hex file.";
+//        return result;
+//    }
+//    else
+//    {
+//        if(!HexFilePtr.open(QFile::ReadOnly))
+//        {
+//            qDebug()<<"cant open file";
+//            return result;
+//        }
+//        qDebug()<<"reading file";
 
-        while (true)
-        {
-            HexRec=HexFilePtr.readLine().trimmed();
-            if(HexRec!="")
+//        while (true)
+//        {
+//            HexRec=HexFilePtr.readLine().trimmed();
 
-                if(HexRec.length()<20){
-                    HexRec.append("ff");
-                    HexRec.append("3f");
-                    HexRec.append("ff");
-                    HexRec.append("3f");
-                }
-            // qDebug()<<
+//            if(HexRec!="")
+//            {
+//                result.append(HexRec.mid(1,HexRec.length()-3));
+//            }
+            //if(HexRec.length()<1)break;
 
-            result.append(HexRec.mid(9,HexRec.length()-(9+2)));//ff 3f ff 3f
+//        }
 
-            if(HexRec.length()<1)break;
-
-        }
-
-    }
-    qDebug()<<"===========";
-    qDebug()<<"hex:"<<result;
+//    }
+//    qDebug()<<"===========";
+//    qDebug()<<"hex:"<<result;
     // qDebug()<<"===========";
     return result;
 }
@@ -324,13 +316,14 @@ QByteArray MainWindow::CreateFlashPacket(int start,int end, QList<QByteArray> he
     return packet;
 }
 //========================================================================================
-QByteArray MainWindow::CreateFlashPacketValve(int start,int end,uint32_t flashAddress, QByteArray hexContent)
+QByteArray MainWindow::CreateFlashPacketValve(int start,int end,uint64_t flashAddress, QByteArray hexContent)
 {
     QByteArray buffer;
 
     buffer.append(0x55);
     buffer.append(0x02);
-    buffer.append(0x10);
+   // buffer.append(0x10);
+    buffer.append((end-start)&0xff);
     buffer.append((char)0x00);
     buffer.append(0x55);
     buffer.append(0xaa);
@@ -343,7 +336,10 @@ QByteArray MainWindow::CreateFlashPacketValve(int start,int end,uint32_t flashAd
 
     for(int i=start;i<end;i++)
     {
-        buffer.append(hexContent[i]);
+        //if(hexContent.length()>=i)
+            buffer.append(hexContent[i]);
+      //  else
+      //      buffer.append(0xFF);
 
     }
     //    uint16_t crc=CalculateCrc((char*)buffer.toStdString().c_str(),buffer.length());
@@ -429,7 +425,7 @@ void MainWindow::ProgramFlash(QString fileName)
         QByteArray expected= QByteArray::fromHex("0103633004");
         if(progress==99 || progress==100) expected= reply;
         qDebug()<<"<<----------- "<<reply.toHex();
-        if(reply!=expected)
+        if(!reply.contains(expected))
         {
             qDebug()<<"<<-----------error------------------ "<<expected.toHex();
             ui->statusbar->showMessage("Flash Error!");
@@ -442,6 +438,14 @@ void MainWindow::ProgramFlash(QString fileName)
 //========================================================================================
 void MainWindow::ProgramFlashValve(QString fileName)
 {
+     QByteArray stringContent;
+    QByteArray HexRec;
+    QByteArray hexContent;
+    uint16_t HexSize =0;
+    uint64_t HexAddress=0,ProgAddress=0;
+    QString temp;
+    int LineCntr=0;
+    int progress=0;
 
     ui->PgrFlash->setValue(0);
     if(!comport.isOpen())
@@ -450,58 +454,154 @@ void MainWindow::ProgramFlashValve(QString fileName)
         return;
     }
     comport.readAll();
-    QByteArray stringContent= LoadHexFileValve(fileName);
-    QByteArray hexContent =QByteArray::fromHex(stringContent);
-    //GetHexFromContent(stringContent);
-
-
-    for (int i=0;i<hexContent.length();i+=16)
+    QFile HexFilePtr(fileName);
+    if(!QFile::exists(fileName))
     {
-        int progress=i*100/hexContent.length();
-        qDebug()<<"completed:"<< progress<<"%";
-        ui->PgrFlash->setValue(progress);
-        int add=2048+i/2;//fmin(hexContent.length(),i+11)
-        QByteArray  packet=CreateFlashPacketValve(i,fmin(hexContent.length(),i+16),add,hexContent);
+        qDebug()<<"Failed to open hex file.";
+    }
+    else
+    {
+        if(!HexFilePtr.open(QFile::ReadOnly))
+        {
+            qDebug()<<"cant open file";
+        }
+        while(1)
+        {
+            HexRec=HexFilePtr.readLine().trimmed();
+            LineCntr++;
+            if(HexRec.length()<1)break;
+        }
+        HexFilePtr.close();
+        if(!HexFilePtr.open(QFile::ReadOnly))
+        {
+            qDebug()<<"cant open file";
+        }
+        qDebug()<<"reading file";
+        while(1)
+        {
+            HexRec=HexFilePtr.readLine().trimmed();
+            stringContent.clear();
+            HexSize =0;
+            HexAddress=0;
+            temp.clear();
+            if(HexRec!="")
+            {
+                stringContent.append(HexRec.mid(1,HexRec.length()-3));
+            }
+            if(HexRec.length()<1)break;
+//            qDebug()<<"===========";
+//            qDebug()<<"hex:"<<stringContent;
+            hexContent =QByteArray::fromHex(stringContent);
 
-        qDebug()<<"----------->> "<<packet.toHex();
+            temp.append(stringContent.mid(0,2));
+            if(temp[0]=='A'){HexSize+=10*16;temp[0]='0';}
+            else if(temp[0]=='B'){HexSize+=11*16;temp[0]='0';}
+            else if(temp[0]=='C'){HexSize+=12*16;temp[0]='0';}
+            else if(temp[0]=='D'){HexSize+=13*16;temp[0]='0';}
+            else if(temp[0]=='E'){HexSize+=14*16;temp[0]='0';}
+            else if(temp[0]=='F'){HexSize+=15*16;temp[0]='0';}
+
+            if(temp[1]=='A'){HexSize+=10;temp[1]='0';}
+            else if(temp[1]=='B'){HexSize+=11;temp[1]='0';}
+            else if(temp[1]=='C'){HexSize+=12;temp[1]='0';}
+            else if(temp[1]=='D'){HexSize+=13;temp[1]='0';}
+            else if(temp[1]=='E'){HexSize+=14;temp[1]='0';}
+            else if(temp[1]=='F'){HexSize+=15;temp[1]='0';}
+            HexSize +=temp.toInt()%10+temp.toInt()/10*16;
+//            qDebug()<<"HexSize:"<<HexSize;
+            temp.clear();
+            temp.append(stringContent.mid(2,4));
+            for(int i=0;i<4;i++){
+                if(temp[i]=='A'){HexAddress+=10*(pow(16,3-i));temp[i]='0';}
+                else if(temp[i]=='B'){HexAddress+=11*(pow(16,3-i));temp[i]='0';}
+                else if(temp[i]=='C'){HexAddress+=12*(pow(16,3-i));temp[i]='0';}
+                else if(temp[i]=='D'){HexAddress+=13*(pow(16,3-i));temp[i]='0';}
+                else if(temp[i]=='E'){HexAddress+=14*(pow(16,3-i));temp[i]='0';}
+                else if(temp[i]=='F'){HexAddress+=15*(pow(16,3-i));temp[i]='0';}
+            }
+            HexAddress+=temp.toInt()%10+((temp.toInt()/10)%10)*16+((temp.toInt()/100)%10)*256+((temp.toInt()/1000)%10)*4096;
+//            qDebug()<<"HexAddress:"<<HexAddress;
+
+            if(HexAddress>600)
+            {
+                progress++;
+                progress+=100/LineCntr*100;
+                ProgAddress=HexAddress/2;
+//                qDebug()<<"ProgAddress:"<<ProgAddress;
+                qDebug()<<"completed:"<< (progress*100/LineCntr)<<"%";
+                ui->PgrFlash->setValue(progress*100/LineCntr);
+
+                QByteArray  packet=CreateFlashPacketValve(4,(HexSize+4),ProgAddress,hexContent);
+                qDebug()<<"----------->> "<<packet.toHex();
+                    comport.readAll();
+                    comport.write(packet);
+                    comport.flush();
+                    WaitMs(1000);
+                    WaitMsNofeedback(20);
+                    QByteArray reply= comport.readAll();
+
+                    QString rx="5502";
+                    if((HexSize&0xff)<16)rx+="0";
+                    rx+=QString::number(HexSize&0xff,16);
+                    rx+="0055aa";
+
+
+                    if((ProgAddress&0xff)<16)rx+="0";
+                    rx+=QString::number(ProgAddress&0xff,16);
+                    ProgAddress>>=8;
+                     if((ProgAddress&0xff)<16)rx+="0";
+                    rx+=QString::number(ProgAddress&0xff,16);
+                    ProgAddress>>=8;
+                    if((ProgAddress&0xff)<16)rx+="0";
+                    rx+=QString::number(ProgAddress&0xff,16);
+                    ProgAddress>>=8;
+                    if((ProgAddress&0xff)<16)rx+="0";
+                    rx+=QString::number(ProgAddress&0xff,16);
+
+                    rx+="01";
+
+                   // qDebug()<<"<<-----rx------ "<<rx;
+
+                    QByteArray expected= QByteArray::fromHex(rx.toLatin1());
+                    if(progress==99 || progress==100) expected= reply;
+                    qDebug()<<"<<----------- "<<reply.toHex();
+                    if(!reply.contains(expected))
+                    {
+                        qDebug()<<"<<-----------error------------------ "<<expected.toHex();
+                        ui->statusbar->showMessage("Flash Error!");
+                        return ;
+                    }
+
+              }
+        }
+
+//        qDebug()<<"Lines:"<<LineCntr;
+
+        QByteArray buffer;
+
+        buffer.append(0x55);
+        buffer.append(0x08);
+        buffer.append((char)0x00);
+        buffer.append(0x38);
+        buffer.append((char)0x00);
+        buffer.append((char)0x00);
+        buffer.append((char)0x00);
+        buffer.append(0x04);
+        buffer.append((char)0x00);
+        buffer.append((char)0x00);
+
+        qDebug()<<"----------->> "<<buffer.toHex();
         comport.readAll();
-        comport.write(packet);
+        comport.write(buffer);
         comport.flush();
         WaitMs(1000);
         WaitMsNofeedback(20);
         QByteArray reply= comport.readAll();
-
-        QString rx="5502100055aa";
-
-
-        if((add&0xff)<16)rx+="0";
-        rx+=QString::number(add&0xff,16);
-        add>>=8;
-         if((add&0xff)<16)rx+="0";
-        rx+=QString::number(add&0xff,16);
-        add>>=8;
-        if((add&0xff)<16)rx+="0";
-        rx+=QString::number(add&0xff,16);
-        add>>=8;
-        if((add&0xff)<16)rx+="0";
-        rx+=QString::number(add&0xff,16);
-
-        rx+="01";
-
-       // qDebug()<<"<<-----rx------ "<<rx;
-
-        QByteArray expected= QByteArray::fromHex(rx.toLatin1());
-        if(progress==99 || progress==100) expected= reply;
         qDebug()<<"<<----------- "<<reply.toHex();
-        if(reply!=expected)
-        {
-            qDebug()<<"<<-----------error------------------ "<<expected.toHex();
-            ui->statusbar->showMessage("Flash Error!");
-            return ;
-        }
 
+
+        ui->PgrFlash->setValue(100);
     }
-    ui->PgrFlash->setValue(100);
 }
 //========================================================================================
 void MainWindow::on_BtnLoadHex_clicked()
@@ -518,7 +618,7 @@ void MainWindow::on_BtnErase_clicked()
 {
     ui->statusbar->showMessage("");
     QString type[4]={"0102422004","5503800355AA00040000","5503800355AA00040000","5503800355AA00040000"};
-    QString correctReplay[4]={"0102422004","5503800355AA0004000001","5503800355AA0004000001","5503800355AA0004000001"};
+    QString correctReplay[4]={"0102422004","5503800300000004000001","5503800300000004000001","5503800300000004000001"};
     if(!comport.isOpen())
     {
         ui->statusbar->showMessage("port open error");
@@ -573,7 +673,7 @@ void MainWindow::on_BtnGotoBoot_clicked()
     comport.setBaudRate(115200);
     comport.open(QSerialPort::ReadWrite);
     comport.readAll();
-QString text="run";
+    QString text="run";
     if(ui->CmbBoardType->currentText()=="RLAL")
     {
                  text="run"+ui->CmbBoardType->currentText();
@@ -590,6 +690,7 @@ QString text="run";
     QByteArray reply= comport.readAll();
     ui->statusbar->showMessage(reply);
     qDebug()<<"replay="<<reply.toHex();
+
 
 }
 

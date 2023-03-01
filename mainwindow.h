@@ -47,7 +47,7 @@ public:
 public slots:
     void ComportReadyRead();
 
-    QByteArray CreateFlashPacketValve(int start, int end, uint32_t flashAddress, QByteArray hexContent);
+    QByteArray CreateFlashPacketValve(int start, int end, uint64_t flashAddress, QByteArray hexContent);
 protected slots:
     void ProgramFlashValve(QString fileName);
 private slots:

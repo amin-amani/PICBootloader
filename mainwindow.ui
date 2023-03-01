@@ -63,7 +63,7 @@
         </font>
        </property>
        <property name="text">
-        <string>Run Main</string>
+        <string>Run</string>
        </property>
       </widget>
      </item>
