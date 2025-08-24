@@ -46,5 +46,5 @@ This project is a **Qt-based GUI application** for programming and controlling m
 
 1. **Clone the Repository:**
    ```bash
-   git clone [<repository_url>](https://github.com/amin-amani/PICBootloader.git)
+   git clone https://github.com/amin-amani/PICBootloader.git
    cd SerialBootloaderGUI
