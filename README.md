@@ -2,7 +2,7 @@
 
 This project is a **Qt-based GUI application** for programming and controlling microcontrollers via a serial port. It allows flashing hex firmware files, erasing chips, reading firmware versions, and managing baud rates.  
 
-![GUI Screenshot](PICBootloader/doc/ui.png)
+![GUI Screenshot](doc/ui.png)
 
 ## Features
 
